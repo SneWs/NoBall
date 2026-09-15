@@ -12,7 +12,8 @@ namespace NoBall
         Color32[] _pixels;
         bool _dirty;
         Vector2Int? _previewOrigin;
-        bool _previewHorizontal;
+        WallRibbon _buildingRibbon;
+        WallRibbon _previewRibbon;
 
         public PlayfieldGrid Grid { get; private set; }
         public float CellSize { get; private set; }
@@ -38,6 +39,8 @@ namespace NoBall
             BuildFrame();
             BuildTexture();
             BuildBounds();
+            _buildingRibbon = new WallRibbon(transform, 4, GameColors.Building);
+            _previewRibbon = new WallRibbon(transform, 3, GameColors.Preview);
             RefreshVisuals();
         }
 
@@ -84,8 +87,12 @@ namespace NoBall
         public void SetPreview(Vector2Int? origin, bool horizontal)
         {
             _previewOrigin = origin;
-            _previewHorizontal = horizontal;
-            _dirty = true;
+            if (origin == null || Grid == null)
+                _previewRibbon?.Hide();
+            else if (horizontal)
+                _previewRibbon.Layout(this, origin.Value.y, 0, Grid.Columns - 1, true);
+            else
+                _previewRibbon.Layout(this, origin.Value.x, 0, Grid.Rows - 1, false);
         }
 
         public void ClearPreview()
@@ -93,7 +100,46 @@ namespace NoBall
             if (_previewOrigin == null)
                 return;
             _previewOrigin = null;
-            _dirty = true;
+            _previewRibbon?.Hide();
+        }
+
+        public void ShowBuildingWall(Vector2Int origin, bool horizontal, IReadOnlyList<Vector2Int> cells)
+        {
+            if (_buildingRibbon == null || cells == null || cells.Count == 0)
+            {
+                _buildingRibbon?.Hide();
+                return;
+            }
+
+            int min;
+            int max;
+            if (horizontal)
+            {
+                min = max = origin.x;
+                for (int i = 0; i < cells.Count; i++)
+                {
+                    min = Mathf.Min(min, cells[i].x);
+                    max = Mathf.Max(max, cells[i].x);
+                }
+
+                _buildingRibbon.Layout(this, origin.y, min, max, true);
+            }
+            else
+            {
+                min = max = origin.y;
+                for (int i = 0; i < cells.Count; i++)
+                {
+                    min = Mathf.Min(min, cells[i].y);
+                    max = Mathf.Max(max, cells[i].y);
+                }
+
+                _buildingRibbon.Layout(this, origin.x, min, max, false);
+            }
+        }
+
+        public void HideBuildingWall()
+        {
+            _buildingRibbon?.Hide();
         }
 
         public void CommitBuildingCells(IEnumerable<Vector2Int> cells, bool fill)
@@ -108,7 +154,7 @@ namespace NoBall
             _dirty = true;
         }
 
-        public void CaptureFromWorldPositions(IReadOnlyList<Vector2> worldPositions)
+        public List<Vector2Int> CaptureFromWorldPositions(IReadOnlyList<Vector2> worldPositions)
         {
             var seeds = new List<Vector2Int>(worldPositions.Count);
             for (int i = 0; i < worldPositions.Count; i++)
@@ -117,9 +163,10 @@ namespace NoBall
                     seeds.Add(cell);
             }
 
-            Grid.CaptureUnreachable(seeds);
+            var captured = Grid.CaptureUnreachable(seeds);
             RebuildColliders();
             _dirty = true;
+            return captured;
         }
 
         public bool CircleHitsBuilding(Vector2 position, float radius, IReadOnlyList<Vector2Int> cells, out Vector2Int hit)
@@ -213,40 +260,25 @@ namespace NoBall
             int height = Grid.Rows * ppc;
             bool seeBackground = GameSettings.ShowsBackground;
             var empty = (Color32)GameColors.Playfield;
-            var gridLine = (Color32)GameColors.PlayfieldGrid;
             var filled = (Color32)GameColors.Captured;
-            var building = (Color32)GameColors.Building;
-            var preview = seeBackground
-                ? (Color32)GameColors.Preview
-                : (Color32)Color.Lerp(GameColors.Playfield, GameColors.Building, 0.45f);
             var seeThrough = new Color32(0, 0, 0, 36);
-            var seeThroughGrid = new Color32(gridLine.r, gridLine.g, gridLine.b, 110);
 
             for (int y = 0; y < Grid.Rows; y++)
             {
                 for (int x = 0; x < Grid.Columns; x++)
                 {
                     var state = Grid[x, y];
-                    Color32 color = state switch
-                    {
-                        CellState.Filled => filled,
-                        CellState.Building => building,
-                        _ => seeBackground ? seeThrough : empty
-                    };
-
-                    if (state == CellState.Empty && IsPreviewCell(x, y))
-                        color = preview;
+                    Color32 color = state == CellState.Filled
+                        ? filled
+                        : (seeBackground ? seeThrough : empty);
 
                     for (int py = 0; py < ppc; py++)
                     {
                         for (int px = 0; px < ppc; px++)
                         {
-                            Color32 pixel = color;
-                            if (state == CellState.Empty && (px == 0 || py == 0))
-                                pixel = seeBackground ? seeThroughGrid : gridLine;
                             int ix = x * ppc + px;
                             int iy = y * ppc + py;
-                            _pixels[iy * width + ix] = pixel;
+                            _pixels[iy * width + ix] = color;
                         }
                     }
                 }
@@ -255,14 +287,6 @@ namespace NoBall
             _texture.SetPixels32(_pixels);
             _texture.Apply(false, false);
             _dirty = false;
-        }
-
-        bool IsPreviewCell(int x, int y)
-        {
-            if (_previewOrigin == null)
-                return false;
-            var origin = _previewOrigin.Value;
-            return _previewHorizontal ? y == origin.y : x == origin.x;
         }
 
         void BuildTexture()
@@ -349,6 +373,108 @@ namespace NoBall
                 0f);
             var box = go.AddComponent<BoxCollider2D>();
             box.size = new Vector2(w * CellSize, h * CellSize);
+        }
+    }
+
+    sealed class WallRibbon
+    {
+        readonly Transform _root;
+        readonly SpriteRenderer _shaft;
+        readonly SpriteRenderer _capA;
+        readonly SpriteRenderer _capB;
+
+        public WallRibbon(Transform parent, int sorting, Color color)
+        {
+            _root = new GameObject("WallRibbon").transform;
+            _root.SetParent(parent, false);
+            _shaft = MakePart("Shaft", _root, SpriteFactory.White, sorting, color);
+            _capA = MakePart("CapA", _root, SpriteFactory.Circle, sorting, color);
+            _capB = MakePart("CapB", _root, SpriteFactory.Circle, sorting, color);
+            Hide();
+        }
+
+        public void Hide()
+        {
+            _root.gameObject.SetActive(false);
+        }
+
+        public void Layout(Playfield field, int lane, int min, int max, bool horizontal)
+        {
+            if (max < min)
+            {
+                Hide();
+                return;
+            }
+
+            _root.gameObject.SetActive(true);
+            float t = field.CellSize * 0.92f;
+            float z = -0.03f;
+
+            if (horizontal)
+            {
+                float x0 = field.BottomLeft.x + min * field.CellSize;
+                float x1 = field.BottomLeft.x + (max + 1) * field.CellSize;
+                float y = field.BottomLeft.y + (lane + 0.5f) * field.CellSize;
+                Place(x0, x1, y, y, t, z, true);
+            }
+            else
+            {
+                float y0 = field.BottomLeft.y + min * field.CellSize;
+                float y1 = field.BottomLeft.y + (max + 1) * field.CellSize;
+                float x = field.BottomLeft.x + (lane + 0.5f) * field.CellSize;
+                Place(x, x, y0, y1, t, z, false);
+            }
+        }
+
+        void Place(float x0, float x1, float y0, float y1, float thickness, float z, bool horizontal)
+        {
+            float length = horizontal ? Mathf.Abs(x1 - x0) : Mathf.Abs(y1 - y0);
+            float cx = (x0 + x1) * 0.5f;
+            float cy = (y0 + y1) * 0.5f;
+            float half = thickness * 0.5f;
+
+            Vector3 capStart = horizontal
+                ? new Vector3(Mathf.Min(x0, x1) + half, cy, z)
+                : new Vector3(cx, Mathf.Min(y0, y1) + half, z);
+            Vector3 capEnd = horizontal
+                ? new Vector3(Mathf.Max(x0, x1) - half, cy, z)
+                : new Vector3(cx, Mathf.Max(y0, y1) - half, z);
+
+            if (length <= thickness + 0.001f)
+            {
+                _shaft.enabled = false;
+                _capA.enabled = true;
+                _capB.enabled = false;
+                _capA.transform.position = new Vector3(cx, cy, z);
+                _capA.transform.localScale = Vector3.one * thickness;
+                return;
+            }
+
+            _shaft.enabled = true;
+            _capA.enabled = true;
+            _capB.enabled = true;
+            _capA.transform.position = capStart;
+            _capB.transform.position = capEnd;
+            _capA.transform.localScale = Vector3.one * thickness;
+            _capB.transform.localScale = Vector3.one * thickness;
+
+            _shaft.transform.position = new Vector3(cx, cy, z);
+            if (horizontal)
+                _shaft.transform.localScale = new Vector3(Mathf.Max(0.001f, length - thickness), thickness, 1f);
+            else
+                _shaft.transform.localScale = new Vector3(thickness, Mathf.Max(0.001f, length - thickness), 1f);
+        }
+
+        static SpriteRenderer MakePart(string name, Transform parent, Sprite sprite, int sorting, Color color)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(parent, false);
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = sprite;
+            sr.sharedMaterial = SpriteFactory.SpriteMaterial;
+            sr.color = color;
+            sr.sortingOrder = sorting;
+            return sr;
         }
     }
 }

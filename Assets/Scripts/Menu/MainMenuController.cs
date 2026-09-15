@@ -210,11 +210,8 @@ namespace NoBall
 
         static string ThumbName(GameBackgroundId id) => id switch
         {
-            GameBackgroundId.Waterfall => "Water",
-            GameBackgroundId.Laboratory => "Lab",
-            GameBackgroundId.Aquarium => "Aqua",
             GameBackgroundId.Aurora => "Aurora",
-            _ => "Classic"
+            _ => "Lab"
         };
     }
 }

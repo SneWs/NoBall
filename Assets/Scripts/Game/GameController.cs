@@ -21,6 +21,9 @@ namespace NoBall
         int _level;
         int _score;
         bool _ended;
+        bool _waitingForNextLevel;
+        float _nextLevelAt;
+        string _nextLevelHint;
         int _lastWidth;
         int _lastHeight;
 
@@ -71,6 +74,14 @@ namespace NoBall
                 _lastHeight = Screen.height;
                 FitCamera();
                 _hud.RefreshSafeArea();
+            }
+
+            if (_waitingForNextLevel)
+            {
+                if (Time.unscaledTime >= _nextLevelAt)
+                    BeginNextLevel();
+                _playfield.LateUpdateVisuals();
+                return;
             }
 
             if (_ended)
@@ -125,6 +136,7 @@ namespace NoBall
             SpawnAtoms(_atomCount);
             _lives = _atomCount;
             _hud.HideEnd();
+            _hud.HideLevelClear();
             RefreshHud();
             if (!string.IsNullOrEmpty(hint))
                 _hud.ShowHint(hint, hintSeconds);
@@ -138,6 +150,7 @@ namespace NoBall
         void Restart()
         {
             _sfx.PlayClick();
+            CancelNextLevelWait();
             ResetRun();
             StartLevel("Swipe horizontally or vertically to build a wall", 4.5f);
         }
@@ -145,6 +158,7 @@ namespace NoBall
         void ReturnToMenu()
         {
             _sfx.PlayClick();
+            CancelNextLevelWait();
             SceneManager.LoadScene(GameConfig.MainMenuScene);
         }
 
@@ -195,6 +209,7 @@ namespace NoBall
             var wall = _wall;
             _wall = null;
             _sfx.StopGrow();
+            _playfield.HideBuildingWall();
             _playfield.CommitBuildingCells(wall.AllCells, wall.AnyHalfCompleted);
             if (!wall.AnyHalfCompleted && _playfield.Grid.InBounds(wall.Origin) && _playfield.Grid[wall.Origin] == CellState.Building)
                 _playfield.SetCell(wall.Origin, CellState.Empty);
@@ -202,7 +217,9 @@ namespace NoBall
             if (wall.AnyHalfCompleted)
             {
                 CopyAtomPositions();
-                _playfield.CaptureFromWorldPositions(_atomPositions);
+                var captured = _playfield.CaptureFromWorldPositions(_atomPositions);
+                if (captured.Count > 0)
+                    WallFx.Shatter(_playfield, captured, _playfield.CellCenter(wall.Origin), GameColors.Playfield);
                 _sfx.PlayComplete();
             }
 
@@ -226,21 +243,49 @@ namespace NoBall
 
         void CompleteLevel()
         {
+            _ended = true;
             _swipe.Cancel();
             _playfield.ClearPreview();
+            for (int i = 0; i < _atoms.Count; i++)
+                _atoms[i].SetPaused(true);
 
             int percent = Mathf.FloorToInt(_playfield.Grid.FilledRatio * 100f);
             int multiplier = GameConfig.LevelMultiplier(percent);
             int gained = GameConfig.ScoreForLevel(percent);
             _score += gained;
-            _sfx.PlayWin();
+            RefreshHud();
+            _hud.ShowLevelClear(gained);
 
             _level++;
             _atomCount = Mathf.Min(_atomCount + 1, GameConfig.MaxAtoms);
-            StartLevel(
+            _nextLevelHint =
                 "Level " + _level + "  •  +" + gained.ToString("N0", System.Globalization.CultureInfo.InvariantCulture) +
-                "  (" + multiplier + "×)",
-                3.5f);
+                "  (" + multiplier + "×)";
+
+            GameAudio.Ensure().Music.Hold();
+            float wait = _sfx.PlayLevelComplete();
+            if (wait <= 0.05f)
+            {
+                BeginNextLevel();
+                return;
+            }
+
+            _waitingForNextLevel = true;
+            _nextLevelAt = Time.unscaledTime + wait;
+        }
+
+        void BeginNextLevel()
+        {
+            _waitingForNextLevel = false;
+            GameAudio.Ensure().Music.Release();
+            StartLevel(_nextLevelHint, 3.5f);
+            _nextLevelHint = null;
+        }
+
+        void CancelNextLevelWait()
+        {
+            _waitingForNextLevel = false;
+            GameAudio.Ensure().Music.Release();
         }
 
         void FailLevel()

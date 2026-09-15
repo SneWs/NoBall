@@ -63,24 +63,18 @@ namespace NoBall
 
     public enum GameBackgroundId
     {
-        Classic = 0,
-        Waterfall = 1,
-        Laboratory = 2,
-        Aquarium = 3,
-        Aurora = 4
+        Laboratory = 0,
+        Aurora = 1
     }
 
     public static class GameBackgrounds
     {
-        public const int Count = 5;
+        public const int Count = 2;
 
         public static string DisplayName(GameBackgroundId id) => id switch
         {
-            GameBackgroundId.Waterfall => "Waterfall",
-            GameBackgroundId.Laboratory => "Laboratory",
-            GameBackgroundId.Aquarium => "Aquarium",
             GameBackgroundId.Aurora => "Aurora",
-            _ => "Classic"
+            _ => "Laboratory"
         };
     }
 
@@ -103,16 +97,16 @@ namespace NoBall
             }
         }
 
-        public static bool ShowsBackground => Background != GameBackgroundId.Classic;
+        public static bool ShowsBackground => true;
 
         public static GameBackgroundId Background
         {
             get
             {
                 int value = UnityEngine.PlayerPrefs.GetInt(BackgroundKey, 0);
-                if (value < 0 || value >= GameBackgrounds.Count)
-                    return GameBackgroundId.Classic;
-                return (GameBackgroundId)value;
+                if (value == (int)GameBackgroundId.Aurora || value == 4)
+                    return GameBackgroundId.Aurora;
+                return GameBackgroundId.Laboratory;
             }
             set
             {

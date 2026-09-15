@@ -36,10 +36,7 @@ namespace NoBall
             if (_meshRenderer == null || _material == null)
                 return;
 
-            bool classic = id == GameBackgroundId.Classic;
-            _meshRenderer.enabled = !classic;
-            if (classic)
-                return;
+            _meshRenderer.enabled = true;
 
             var tex = TextureFor(id);
             if (tex != null)
@@ -74,11 +71,8 @@ namespace NoBall
         {
             string path = id switch
             {
-                GameBackgroundId.Waterfall => "Backgrounds/Waterfall",
-                GameBackgroundId.Laboratory => "Backgrounds/Laboratory",
-                GameBackgroundId.Aquarium => "Backgrounds/Aquarium",
                 GameBackgroundId.Aurora => "Backgrounds/Aurora",
-                _ => null
+                _ => "Backgrounds/Laboratory"
             };
             return string.IsNullOrEmpty(path) ? null : Resources.Load<Texture2D>(path);
         }

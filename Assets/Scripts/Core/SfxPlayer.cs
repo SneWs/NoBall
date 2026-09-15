@@ -13,6 +13,7 @@ namespace NoBall
         AudioClip _hit;
         AudioClip _complete;
         AudioClip _win;
+        AudioClip _levelComplete;
         AudioClip _lose;
         AudioClip _click;
         float _lastBounceTime = -1f;
@@ -30,6 +31,9 @@ namespace NoBall
             _hit = HitClip();
             _complete = CompleteClip();
             _win = WinClip();
+            _levelComplete = Resources.Load<AudioClip>("Music/level_complete");
+            if (_levelComplete != null)
+                _levelComplete.LoadAudioData();
             _lose = LoseClip();
             _click = ClickClip();
             _grow.clip = _growLoop;
@@ -88,8 +92,18 @@ namespace NoBall
 
         public void PlayWin()
         {
+            PlayLevelComplete();
+        }
+
+        public float PlayLevelComplete()
+        {
             StopGrow();
-            Play(_win, 0.7f);
+            var clip = _levelComplete != null ? _levelComplete : _win;
+            if (!GameSettings.SoundEnabled || clip == null || _oneShot == null)
+                return 0f;
+            _oneShot.pitch = 1f;
+            _oneShot.PlayOneShot(clip, _levelComplete != null ? 0.9f : 0.7f);
+            return Mathf.Max(0.05f, clip.length);
         }
 
         public void PlayLose()

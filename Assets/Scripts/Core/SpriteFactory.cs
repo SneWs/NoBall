@@ -7,6 +7,7 @@ namespace NoBall
         static Sprite _white;
         static Sprite _atom;
         static Sprite _rounded;
+        static Sprite _circle;
         static Material _spriteMaterial;
 
         public static Material SpriteMaterial
@@ -51,6 +52,16 @@ namespace NoBall
                 if (_rounded == null)
                     _rounded = FromTexture(MakeRoundedRect(48, 48, 10), 48f, new Vector4(12, 12, 12, 12));
                 return _rounded;
+            }
+        }
+
+        public static Sprite Circle
+        {
+            get
+            {
+                if (_circle == null)
+                    _circle = FromTexture(MakeCircle(64), 64f);
+                return _circle;
             }
         }
 
@@ -124,6 +135,29 @@ namespace NoBall
 
             tex.SetPixels(pixels);
             tex.filterMode = FilterMode.Bilinear;
+            return tex;
+        }
+
+        static Texture2D MakeCircle(int size)
+        {
+            var tex = new Texture2D(size, size, TextureFormat.RGBA32, false);
+            var pixels = new Color[size * size];
+            float cx = (size - 1) * 0.5f;
+            float cy = (size - 1) * 0.5f;
+            float r = size * 0.5f - 0.75f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = x - cx;
+                    float dy = y - cy;
+                    float d = Mathf.Sqrt(dx * dx + dy * dy);
+                    float a = Mathf.Clamp01(r - d + 1f);
+                    pixels[y * size + x] = new Color(1f, 1f, 1f, a);
+                }
+            }
+
+            tex.SetPixels(pixels);
             return tex;
         }
 

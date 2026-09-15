@@ -3,7 +3,7 @@ Shader "NoBall/GameBackground"
     Properties
     {
         _MainTex ("Texture", 2D) = "white" {}
-        _Effect ("Effect", Float) = 1
+        _Effect ("Effect", Float) = 0
         _Aspect ("Aspect", Float) = 1.777
         _UseTex ("UseTex", Float) = 1
         _AnimTime ("AnimTime", Float) = 0
@@ -383,27 +383,9 @@ Shader "NoBall/GameBackground"
                 float3 col;
 
                 if (_UseTex > 0.5)
-                {
-                    if (_Effect < 1.5)
-                        col = TexturedWaterfall(uv, t);
-                    else if (_Effect < 2.5)
-                        col = TexturedLaboratory(uv, t);
-                    else if (_Effect < 3.5)
-                        col = TexturedAquarium(uv, t);
-                    else
-                        col = TexturedAurora(uv, t);
-                }
+                    col = _Effect < 0.5 ? TexturedLaboratory(uv, t) : TexturedAurora(uv, t);
                 else
-                {
-                    if (_Effect < 1.5)
-                        col = ProceduralWaterfall(uv, t);
-                    else if (_Effect < 2.5)
-                        col = ProceduralLaboratory(uv, t);
-                    else if (_Effect < 3.5)
-                        col = ProceduralAquarium(uv, t);
-                    else
-                        col = ProceduralAurora(uv, t);
-                }
+                    col = _Effect < 0.5 ? ProceduralLaboratory(uv, t) : ProceduralAurora(uv, t);
 
                 float vig = smoothstep(1.15, 0.28, length((uv - 0.5) * float2(1.15, 1.0)));
                 col *= 0.88 + 0.12 * vig;

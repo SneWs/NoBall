@@ -5,9 +5,9 @@ namespace NoBall
     public sealed class MusicPlayer : MonoBehaviour
     {
         AudioSource _source;
-        GameBackgroundId _theme;
-        float _targetVolume = 0.34f;
+        float _targetVolume = 0.42f;
         bool _built;
+        bool _held;
 
         public void Build()
         {
@@ -20,58 +20,44 @@ namespace NoBall
             _source.spatialBlend = 0f;
             _source.volume = 0f;
             _source.priority = 64;
+            _source.clip = Resources.Load<AudioClip>("Music/lab_background_music");
+            if (_source.clip != null)
+                _source.clip.LoadAudioData();
             GameSettings.SoundChanged += Refresh;
-            GameSettings.BackgroundChanged += OnBackgroundChanged;
-            Apply(GameSettings.Background, true);
+            Refresh();
+        }
+
+        public void Hold()
+        {
+            _held = true;
+            if (_source != null && _source.isPlaying)
+                _source.Pause();
+        }
+
+        public void Release()
+        {
+            _held = false;
+            Refresh();
         }
 
         void OnDestroy()
         {
             GameSettings.SoundChanged -= Refresh;
-            GameSettings.BackgroundChanged -= OnBackgroundChanged;
         }
 
         void Update()
         {
             if (_source == null)
                 return;
-            float want = GameSettings.SoundEnabled ? _targetVolume : 0f;
+            float want = !_held && GameSettings.SoundEnabled ? _targetVolume : 0f;
             _source.volume = Mathf.MoveTowards(_source.volume, want, Time.unscaledDeltaTime * 1.2f);
-            if (!GameSettings.SoundEnabled && _source.volume <= 0.001f && _source.isPlaying)
+            if ((_held || !GameSettings.SoundEnabled) && _source.volume <= 0.001f && _source.isPlaying)
                 _source.Pause();
-        }
-
-        void OnBackgroundChanged()
-        {
-            Apply(GameSettings.Background, false);
-        }
-
-        void Apply(GameBackgroundId id, bool immediate)
-        {
-            if (!immediate && _theme == id && _source.clip != null)
-            {
-                Refresh();
-                return;
-            }
-
-            _theme = id;
-            var clip = ThemeMusic.Get(id);
-            if (_source.clip != clip)
-            {
-                bool wasPlaying = _source.isPlaying || immediate;
-                _source.clip = clip;
-                if (!immediate)
-                    _source.volume = 0f;
-                if (wasPlaying && GameSettings.SoundEnabled)
-                    _source.Play();
-            }
-
-            Refresh();
         }
 
         void Refresh()
         {
-            if (_source == null || _source.clip == null)
+            if (_held || _source == null || _source.clip == null)
                 return;
             if (!GameSettings.SoundEnabled)
                 return;

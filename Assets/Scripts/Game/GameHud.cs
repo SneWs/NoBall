@@ -13,6 +13,9 @@ namespace NoBall
         GameObject _endPanel;
         Text _endTitle;
         Text _endBody;
+        GameObject _clearPanel;
+        Text _clearPoints;
+        Text _clearReady;
         RectTransform _safe;
         float _hintTimer;
 
@@ -48,7 +51,9 @@ namespace NoBall
             UiFactory.SetAnchored(_hint.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(900, 64), new Vector2(0f, 36f));
 
             BuildEndPanel(onMenu, onRetry);
+            BuildClearBanner();
             HideEnd();
+            HideLevelClear();
         }
 
         public void RefreshSafeArea()
@@ -84,6 +89,21 @@ namespace NoBall
                 _endPanel.SetActive(false);
         }
 
+        public void ShowLevelClear(int points)
+        {
+            if (_clearPanel == null)
+                return;
+            _clearPoints.text = "+" + points.ToString("N0", System.Globalization.CultureInfo.InvariantCulture);
+            _clearReady.text = "Get ready for the next level";
+            _clearPanel.SetActive(true);
+        }
+
+        public void HideLevelClear()
+        {
+            if (_clearPanel != null)
+                _clearPanel.SetActive(false);
+        }
+
         void Update()
         {
             if (_hintTimer > 0f)
@@ -92,6 +112,21 @@ namespace NoBall
                 if (_hintTimer <= 0f)
                     _hint.enabled = false;
             }
+        }
+
+        void BuildClearBanner()
+        {
+            var card = UiFactory.CreateImage("LevelClear", _safe, new Color(0.04f, 0.06f, 0.1f, 0.72f), SpriteFactory.Rounded);
+            UiFactory.SetAnchored(card.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(720, 220), Vector2.zero);
+            card.raycastTarget = false;
+            _clearPanel = card.gameObject;
+
+            _clearPoints = UiFactory.CreateLabel("Points", card.rectTransform, "+0", 72, GameColors.Building);
+            UiFactory.SetAnchored(_clearPoints.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(680, 90), new Vector2(0f, 32f));
+            _clearPoints.fontStyle = FontStyle.Bold;
+
+            _clearReady = UiFactory.CreateLabel("Ready", card.rectTransform, "Get ready for the next level", 32, GameColors.Title);
+            UiFactory.SetAnchored(_clearReady.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(680, 48), new Vector2(0f, -42f));
         }
 
         void BuildEndPanel(UnityAction onMenu, UnityAction onRetry)

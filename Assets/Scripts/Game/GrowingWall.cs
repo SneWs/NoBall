@@ -31,6 +31,8 @@ namespace NoBall
             _negativeDir = horizontal ? Vector2Int.left : Vector2Int.down;
             _all.Add(origin);
             playfield.SetCell(origin, CellState.Building);
+            playfield.ShowBuildingWall(Origin, Horizontal, _all);
+            WallFx.GrowTip(playfield.CellCenter(origin), Vector2.zero);
         }
 
         public void Tick(float dt, IReadOnlyList<Atom> atoms)
@@ -79,6 +81,8 @@ namespace NoBall
             cells.Add(next);
             _all.Add(next);
             _playfield.SetCell(next, CellState.Building);
+            _playfield.ShowBuildingWall(Origin, Horizontal, _all);
+            WallFx.GrowTip(_playfield.CellCenter(next), new Vector2(dir.x, dir.y));
         }
 
         bool HitsAtoms(IReadOnlyList<Atom> atoms)
@@ -92,32 +96,40 @@ namespace NoBall
                     continue;
 
                 LostLife = true;
+                var rect = _playfield.CellWorldRect(hit);
+                var crash = new Vector2(
+                    Mathf.Clamp(atom.Position.x, rect.xMin, rect.xMax),
+                    Mathf.Clamp(atom.Position.y, rect.yMin, rect.yMax));
+                atom.PlayWallCrash();
+                ImpactFx.WallCrash(crash);
                 bool hitOrigin = hit == Origin;
                 bool hitPositive = _positive.Contains(hit);
                 bool hitNegative = _negative.Contains(hit);
 
                 if (hitOrigin || (hitPositive && hitNegative))
                 {
-                    CancelHalf(ref _positiveActive, _positive);
-                    CancelHalf(ref _negativeActive, _negative);
+                    CancelHalf(ref _positiveActive, _positive, crash);
+                    CancelHalf(ref _negativeActive, _negative, crash);
+                    ShatterOrigin(crash);
                     _positiveActive = false;
                     _negativeActive = false;
                     return true;
                 }
 
                 if (hitPositive)
-                    CancelHalf(ref _positiveActive, _positive);
+                    CancelHalf(ref _positiveActive, _positive, crash);
                 if (hitNegative)
-                    CancelHalf(ref _negativeActive, _negative);
+                    CancelHalf(ref _negativeActive, _negative, crash);
                 return true;
             }
 
             return false;
         }
 
-        void CancelHalf(ref bool active, List<Vector2Int> cells)
+        void CancelHalf(ref bool active, List<Vector2Int> cells, Vector2 crash)
         {
             active = false;
+            WallFx.Shatter(_playfield, cells, crash);
             for (int i = 0; i < cells.Count; i++)
             {
                 var cell = cells[i];
@@ -126,6 +138,17 @@ namespace NoBall
             }
 
             cells.Clear();
+            _playfield.ShowBuildingWall(Origin, Horizontal, _all);
+        }
+
+        void ShatterOrigin(Vector2 crash)
+        {
+            if (!_playfield.Grid.InBounds(Origin) || _playfield.Grid[Origin] != CellState.Building)
+                return;
+            WallFx.Shatter(_playfield, new[] { Origin }, crash);
+            _playfield.SetCell(Origin, CellState.Empty);
+            _all.Remove(Origin);
+            _playfield.ShowBuildingWall(Origin, Horizontal, _all);
         }
     }
 }
