@@ -41,6 +41,9 @@ namespace NoBall
             _playfield = fieldGo.AddComponent<Playfield>();
             BuildPlayfield();
 
+            var backgroundGo = new GameObject("Background");
+            backgroundGo.AddComponent<GameBackgroundView>().BuildPlayfield(_playfield.WorldSize);
+
             var swipeGo = new GameObject("Swipe");
             _swipe = swipeGo.AddComponent<SwipeReader>();
             _swipe.Build(_camera);

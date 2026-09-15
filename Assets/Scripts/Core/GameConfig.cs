@@ -61,9 +61,35 @@ namespace NoBall
         }
     }
 
+    public enum GameBackgroundId
+    {
+        Classic = 0,
+        Waterfall = 1,
+        Laboratory = 2,
+        Aquarium = 3,
+        Aurora = 4
+    }
+
+    public static class GameBackgrounds
+    {
+        public const int Count = 5;
+
+        public static string DisplayName(GameBackgroundId id) => id switch
+        {
+            GameBackgroundId.Waterfall => "Waterfall",
+            GameBackgroundId.Laboratory => "Laboratory",
+            GameBackgroundId.Aquarium => "Aquarium",
+            GameBackgroundId.Aurora => "Aurora",
+            _ => "Classic"
+        };
+    }
+
     public static class GameSettings
     {
         const string SoundKey = "noball.sound";
+        const string BackgroundKey = "noball.background";
+
+        public static event System.Action BackgroundChanged;
 
         public static bool SoundEnabled
         {
@@ -72,6 +98,25 @@ namespace NoBall
             {
                 UnityEngine.PlayerPrefs.SetInt(SoundKey, value ? 1 : 0);
                 UnityEngine.PlayerPrefs.Save();
+            }
+        }
+
+        public static bool ShowsBackground => Background != GameBackgroundId.Classic;
+
+        public static GameBackgroundId Background
+        {
+            get
+            {
+                int value = UnityEngine.PlayerPrefs.GetInt(BackgroundKey, 0);
+                if (value < 0 || value >= GameBackgrounds.Count)
+                    return GameBackgroundId.Classic;
+                return (GameBackgroundId)value;
+            }
+            set
+            {
+                UnityEngine.PlayerPrefs.SetInt(BackgroundKey, (int)value);
+                UnityEngine.PlayerPrefs.Save();
+                BackgroundChanged?.Invoke();
             }
         }
     }

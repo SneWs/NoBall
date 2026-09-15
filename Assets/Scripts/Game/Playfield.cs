@@ -7,7 +7,6 @@ namespace NoBall
     {
         Texture2D _texture;
         SpriteRenderer _fieldRenderer;
-        SpriteRenderer _frameRenderer;
         Transform _colliderRoot;
         Transform _boundRoot;
         Color32[] _pixels;
@@ -212,11 +211,16 @@ namespace NoBall
             int ppc = GameConfig.PixelsPerCell;
             int width = Grid.Columns * ppc;
             int height = Grid.Rows * ppc;
+            bool seeBackground = GameSettings.ShowsBackground;
             var empty = (Color32)GameColors.Playfield;
             var gridLine = (Color32)GameColors.PlayfieldGrid;
             var filled = (Color32)GameColors.Captured;
             var building = (Color32)GameColors.Building;
-            var preview = (Color32)Color.Lerp(GameColors.Playfield, GameColors.Building, 0.45f);
+            var preview = seeBackground
+                ? (Color32)GameColors.Preview
+                : (Color32)Color.Lerp(GameColors.Playfield, GameColors.Building, 0.45f);
+            var seeThrough = new Color32(0, 0, 0, 36);
+            var seeThroughGrid = new Color32(gridLine.r, gridLine.g, gridLine.b, 110);
 
             for (int y = 0; y < Grid.Rows; y++)
             {
@@ -227,7 +231,7 @@ namespace NoBall
                     {
                         CellState.Filled => filled,
                         CellState.Building => building,
-                        _ => empty
+                        _ => seeBackground ? seeThrough : empty
                     };
 
                     if (state == CellState.Empty && IsPreviewCell(x, y))
@@ -239,7 +243,7 @@ namespace NoBall
                         {
                             Color32 pixel = color;
                             if (state == CellState.Empty && (px == 0 || py == 0))
-                                pixel = gridLine;
+                                pixel = seeBackground ? seeThroughGrid : gridLine;
                             int ix = x * ppc + px;
                             int iy = y * ppc + py;
                             _pixels[iy * width + ix] = pixel;
@@ -288,21 +292,31 @@ namespace NoBall
             _fieldRenderer = field.AddComponent<SpriteRenderer>();
             _fieldRenderer.sprite = sprite;
             _fieldRenderer.sharedMaterial = SpriteFactory.SpriteMaterial;
-            _fieldRenderer.sortingOrder = 1;
+            _fieldRenderer.sortingOrder = 2;
         }
 
         void BuildFrame()
         {
-            var frame = new GameObject("Frame");
-            frame.transform.SetParent(transform, false);
-            frame.transform.position = new Vector3(Center.x, Center.y, 0f);
-            _frameRenderer = frame.AddComponent<SpriteRenderer>();
-            _frameRenderer.sprite = SpriteFactory.White;
-            _frameRenderer.sharedMaterial = SpriteFactory.SpriteMaterial;
-            _frameRenderer.color = GameColors.Frame;
-            _frameRenderer.sortingOrder = 0;
-            float pad = 0.18f;
-            frame.transform.localScale = new Vector3(WorldSize.x + pad, WorldSize.y + pad, 1f);
+            float t = 0.18f;
+            float w = WorldSize.x;
+            float h = WorldSize.y;
+            CreateFrameBar("FrameLeft", new Vector2(BottomLeft.x - t * 0.5f, Center.y), new Vector2(t, h + t * 2f));
+            CreateFrameBar("FrameRight", new Vector2(BottomLeft.x + w + t * 0.5f, Center.y), new Vector2(t, h + t * 2f));
+            CreateFrameBar("FrameBottom", new Vector2(Center.x, BottomLeft.y - t * 0.5f), new Vector2(w + t * 2f, t));
+            CreateFrameBar("FrameTop", new Vector2(Center.x, BottomLeft.y + h + t * 0.5f), new Vector2(w + t * 2f, t));
+        }
+
+        void CreateFrameBar(string name, Vector2 position, Vector2 size)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(transform, false);
+            go.transform.position = new Vector3(position.x, position.y, 0f);
+            go.transform.localScale = new Vector3(size.x, size.y, 1f);
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = SpriteFactory.White;
+            sr.sharedMaterial = SpriteFactory.SpriteMaterial;
+            sr.color = GameColors.Frame;
+            sr.sortingOrder = 3;
         }
 
         void BuildBounds()
