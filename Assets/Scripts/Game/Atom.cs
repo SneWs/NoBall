@@ -10,6 +10,8 @@ namespace NoBall
         float _signY = 1f;
         bool _paused;
 
+        public System.Action Bounced;
+
         public Vector2 Position => _body != null ? _body.position : (Vector2)transform.position;
         public float Radius { get; private set; }
 
@@ -60,10 +62,25 @@ namespace NoBall
                 return;
 
             var velocity = _body.linearVelocity;
+            bool bounced = false;
             if (Mathf.Abs(velocity.x) > 0.01f)
-                _signX = Mathf.Sign(velocity.x);
+            {
+                float sign = Mathf.Sign(velocity.x);
+                if (sign != _signX)
+                    bounced = true;
+                _signX = sign;
+            }
+
             if (Mathf.Abs(velocity.y) > 0.01f)
-                _signY = Mathf.Sign(velocity.y);
+            {
+                float sign = Mathf.Sign(velocity.y);
+                if (sign != _signY)
+                    bounced = true;
+                _signY = sign;
+            }
+
+            if (bounced)
+                Bounced?.Invoke();
             ApplyVelocity();
         }
 

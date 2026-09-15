@@ -51,8 +51,7 @@ namespace NoBall
 
             _hud = gameObject.AddComponent<GameHud>();
             _hud.Build(ReturnToMenu, Restart);
-            _sfx = gameObject.AddComponent<SfxPlayer>();
-            _sfx.Build();
+            _sfx = GameAudio.Ensure().Sfx;
 
             ResetRun();
             StartLevel("Swipe horizontally or vertically to build a wall", 4.5f);
@@ -169,6 +168,7 @@ namespace NoBall
 
             _playfield.ClearPreview();
             _wall = new GrowingWall(_playfield, origin, horizontal);
+            _sfx.PlayGrowStart();
         }
 
         void UpdatePreview()
@@ -194,6 +194,7 @@ namespace NoBall
         {
             var wall = _wall;
             _wall = null;
+            _sfx.StopGrow();
             _playfield.CommitBuildingCells(wall.AllCells, wall.AnyHalfCompleted);
             if (!wall.AnyHalfCompleted && _playfield.Grid.InBounds(wall.Origin) && _playfield.Grid[wall.Origin] == CellState.Building)
                 _playfield.SetCell(wall.Origin, CellState.Empty);
@@ -281,6 +282,7 @@ namespace NoBall
                     GameConfig.AtomSpeed,
                     _bounce,
                     dirs[i % dirs.Length]);
+                atom.Bounced += OnAtomBounced;
                 _atoms.Add(atom);
             }
         }
@@ -327,12 +329,20 @@ namespace NoBall
                 _atomPositions.Add(_atoms[i].Position);
         }
 
+        void OnAtomBounced()
+        {
+            _sfx.PlayBounce();
+        }
+
         void ClearAtoms()
         {
             for (int i = 0; i < _atoms.Count; i++)
             {
                 if (_atoms[i] != null)
+                {
+                    _atoms[i].Bounced -= OnAtomBounced;
                     Destroy(_atoms[i].gameObject);
+                }
             }
 
             _atoms.Clear();

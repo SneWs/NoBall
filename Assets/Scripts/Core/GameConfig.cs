@@ -90,6 +90,7 @@ namespace NoBall
         const string BackgroundKey = "noball.background";
 
         public static event System.Action BackgroundChanged;
+        public static event System.Action SoundChanged;
 
         public static bool SoundEnabled
         {
@@ -98,6 +99,7 @@ namespace NoBall
             {
                 UnityEngine.PlayerPrefs.SetInt(SoundKey, value ? 1 : 0);
                 UnityEngine.PlayerPrefs.Save();
+                SoundChanged?.Invoke();
             }
         }
 

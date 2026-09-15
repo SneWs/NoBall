@@ -4,75 +4,274 @@ namespace NoBall
 {
     public sealed class SfxPlayer : MonoBehaviour
     {
-        AudioSource _source;
-        AudioClip _complete;
+        AudioSource _oneShot;
+        AudioSource _bounceSource;
+        AudioSource _grow;
+        AudioClip _bounce;
+        AudioClip _growStart;
+        AudioClip _growLoop;
         AudioClip _hit;
+        AudioClip _complete;
         AudioClip _win;
         AudioClip _lose;
         AudioClip _click;
+        float _lastBounceTime = -1f;
 
         public void Build()
         {
-            _source = gameObject.AddComponent<AudioSource>();
-            _source.playOnAwake = false;
-            _source.spatialBlend = 0f;
-            _complete = Tone(740f, 0.07f);
-            _hit = Tone(160f, 0.14f, 0.55f);
-            _win = Chord(new[] { 523f, 659f, 784f }, 0.28f);
-            _lose = Tone(110f, 0.32f, 0.7f);
-            _click = Tone(520f, 0.04f, 0.25f);
+            _oneShot = CreateSource(128);
+            _bounceSource = CreateSource(100);
+            _grow = CreateSource(96);
+            _grow.loop = true;
+            GameSettings.SoundChanged += OnSoundChanged;
+            _bounce = BounceClip();
+            _growStart = GrowStartClip();
+            _growLoop = GrowLoopClip();
+            _hit = HitClip();
+            _complete = CompleteClip();
+            _win = WinClip();
+            _lose = LoseClip();
+            _click = ClickClip();
+            _grow.clip = _growLoop;
         }
 
-        public void PlayComplete() => Play(_complete, 0.55f);
-        public void PlayHit() => Play(_hit, 0.7f);
-        public void PlayWin() => Play(_win, 0.65f);
-        public void PlayLose() => Play(_lose, 0.75f);
-        public void PlayClick() => Play(_click, 0.4f);
+        public void PlayBounce()
+        {
+            if (Time.unscaledTime - _lastBounceTime < 0.042f)
+                return;
+            _lastBounceTime = Time.unscaledTime;
+            if (!GameSettings.SoundEnabled || _bounce == null || _bounceSource == null)
+                return;
+            _bounceSource.pitch = Random.Range(0.9f, 1.16f);
+            _bounceSource.PlayOneShot(_bounce, 0.32f);
+        }
+
+        void OnDestroy()
+        {
+            GameSettings.SoundChanged -= OnSoundChanged;
+        }
+
+        void OnSoundChanged()
+        {
+            if (!GameSettings.SoundEnabled)
+                StopGrow();
+        }
+
+        public void PlayGrowStart()
+        {
+            StopGrow();
+            Play(_growStart, 0.42f);
+            if (!GameSettings.SoundEnabled || _grow == null || _growLoop == null)
+                return;
+            _grow.volume = 0.22f;
+            _grow.pitch = 1f;
+            _grow.Play();
+        }
+
+        public void StopGrow()
+        {
+            if (_grow != null && _grow.isPlaying)
+                _grow.Stop();
+        }
+
+        public void PlayComplete()
+        {
+            StopGrow();
+            Play(_complete, 0.58f);
+        }
+
+        public void PlayHit()
+        {
+            StopGrow();
+            Play(_hit, 0.72f);
+        }
+
+        public void PlayWin()
+        {
+            StopGrow();
+            Play(_win, 0.7f);
+        }
+
+        public void PlayLose()
+        {
+            StopGrow();
+            Play(_lose, 0.78f);
+        }
+
+        public void PlayClick() => Play(_click, 0.38f);
 
         void Play(AudioClip clip, float volume)
         {
-            if (!GameSettings.SoundEnabled || clip == null || _source == null)
+            if (!GameSettings.SoundEnabled || clip == null || _oneShot == null)
                 return;
-            _source.PlayOneShot(clip, volume);
+            _oneShot.PlayOneShot(clip, volume);
         }
 
-        static AudioClip Tone(float freq, float duration, float volume = 0.4f)
+        AudioSource CreateSource(int priority)
         {
-            int rate = 22050;
-            int samples = Mathf.CeilToInt(rate * duration);
-            var data = new float[samples];
-            for (int i = 0; i < samples; i++)
+            var source = gameObject.AddComponent<AudioSource>();
+            source.playOnAwake = false;
+            source.spatialBlend = 0f;
+            source.priority = priority;
+            return source;
+        }
+
+        static AudioClip BounceClip()
+        {
+            var data = AudioSynth.Buffer(0.07f);
+            int n = data.Length;
+            for (int i = 0; i < n; i++)
             {
-                float t = i / (float)rate;
-                float env = 1f - i / (float)samples;
-                env *= env;
-                data[i] = Mathf.Sin(2f * Mathf.PI * freq * t) * env * volume;
+                float t = i / (float)AudioSynth.Rate;
+                float env = AudioSynth.Exp(i, n);
+                float body = AudioSynth.Sin(420f, t) * env;
+                float click = (AudioSynth.Hash(i) - 0.5f) * Mathf.Exp(-t * 70f);
+                data[i] = body * 0.75f + click * 0.18f;
             }
 
-            var clip = AudioClip.Create("tone", samples, 1, rate, false);
-            clip.SetData(data, 0);
-            return clip;
+            AudioSynth.Normalize(data, 0.85f);
+            return AudioSynth.Clip("bounce", data);
         }
 
-        static AudioClip Chord(float[] freqs, float duration)
+        static AudioClip GrowStartClip()
         {
-            int rate = 22050;
-            int samples = Mathf.CeilToInt(rate * duration);
-            var data = new float[samples];
-            float inv = 1f / freqs.Length;
-            for (int i = 0; i < samples; i++)
+            var data = AudioSynth.Buffer(0.12f);
+            int n = data.Length;
+            for (int i = 0; i < n; i++)
             {
-                float t = i / (float)rate;
-                float env = 1f - i / (float)samples;
+                float t = i / (float)AudioSynth.Rate;
+                float env = AudioSynth.AttackDecay(i, n, 0.08f);
+                float freq = Mathf.Lerp(320f, 920f, t / 0.12f);
+                data[i] = AudioSynth.SoftSaw(freq, t) * env * 0.55f
+                          + AudioSynth.Sin(freq * 2.02f, t) * env * 0.2f;
+            }
+
+            AudioSynth.Normalize(data, 0.8f);
+            return AudioSynth.Clip("growStart", data);
+        }
+
+        static AudioClip GrowLoopClip()
+        {
+            const float duration = 0.25f;
+            var data = AudioSynth.Buffer(duration);
+            int n = data.Length;
+            float hum = AudioSynth.LoopFreq(196f, duration);
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)AudioSynth.Rate;
+                float p = i / (float)n;
+                float pulse = 0.55f + 0.45f * AudioSynth.Sin(16f, t);
+                float noise = AudioSynth.LoopNoise(p, 0.9f);
+                data[i] = noise * 0.28f * pulse + AudioSynth.Sin(hum, t) * 0.16f * pulse;
+            }
+
+            AudioSynth.Normalize(data, 0.55f);
+            return AudioSynth.Clip("growLoop", data);
+        }
+
+        static AudioClip HitClip()
+        {
+            var data = AudioSynth.Buffer(0.24f);
+            int n = data.Length;
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)AudioSynth.Rate;
+                float env = AudioSynth.Exp(i, n);
+                float body = AudioSynth.Sin(78f, t) * env + AudioSynth.Sin(132f, t) * env * 0.55f;
+                float noise = (AudioSynth.Hash(i) - 0.5f) * Mathf.Exp(-t * 18f);
+                data[i] = body * 0.7f + noise * 0.55f;
+            }
+
+            AudioSynth.Normalize(data, 0.9f);
+            return AudioSynth.Clip("hit", data);
+        }
+
+        static AudioClip CompleteClip()
+        {
+            var data = AudioSynth.Buffer(0.22f);
+            int n = data.Length;
+            float[] notes = { 523.25f, 659.25f, 783.99f };
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)AudioSynth.Rate;
                 float s = 0f;
-                for (int f = 0; f < freqs.Length; f++)
-                    s += Mathf.Sin(2f * Mathf.PI * freqs[f] * t);
-                data[i] = s * inv * env * 0.35f;
+                for (int k = 0; k < notes.Length; k++)
+                {
+                    float start = k * 0.04f;
+                    if (t < start)
+                        continue;
+                    float lt = t - start;
+                    float env = Mathf.Exp(-lt * 9f);
+                    s += AudioSynth.Sin(notes[k], lt) * env;
+                }
+
+                data[i] = s * 0.45f;
             }
 
-            var clip = AudioClip.Create("chord", samples, 1, rate, false);
-            clip.SetData(data, 0);
-            return clip;
+            AudioSynth.Normalize(data, 0.8f);
+            return AudioSynth.Clip("complete", data);
+        }
+
+        static AudioClip WinClip()
+        {
+            var data = AudioSynth.Buffer(0.55f);
+            int n = data.Length;
+            float[] notes = { 523.25f, 659.25f, 783.99f, 1046.5f };
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)AudioSynth.Rate;
+                float s = 0f;
+                for (int k = 0; k < notes.Length; k++)
+                {
+                    float start = k * 0.08f;
+                    if (t < start)
+                        continue;
+                    float lt = t - start;
+                    float env = Mathf.Exp(-lt * 5f);
+                    s += AudioSynth.Sin(notes[k], lt) * env;
+                    s += AudioSynth.Sin(notes[k] * 2.01f, lt) * env * 0.12f;
+                }
+
+                data[i] = s * 0.4f;
+            }
+
+            AudioSynth.Normalize(data, 0.85f);
+            return AudioSynth.Clip("win", data);
+        }
+
+        static AudioClip LoseClip()
+        {
+            var data = AudioSynth.Buffer(0.5f);
+            int n = data.Length;
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)AudioSynth.Rate;
+                float env = AudioSynth.Exp(i, n);
+                float slide = Mathf.Lerp(180f, 70f, t / 0.5f);
+                float rumble = (AudioSynth.Hash(i / 8) - 0.5f) * env * 0.2f;
+                data[i] = AudioSynth.SoftSaw(slide, t) * env * 0.55f
+                          + AudioSynth.Sin(slide * 0.5f, t) * env * 0.3f
+                          + rumble;
+            }
+
+            AudioSynth.Normalize(data, 0.88f);
+            return AudioSynth.Clip("lose", data);
+        }
+
+        static AudioClip ClickClip()
+        {
+            var data = AudioSynth.Buffer(0.045f);
+            int n = data.Length;
+            for (int i = 0; i < n; i++)
+            {
+                float t = i / (float)AudioSynth.Rate;
+                float env = AudioSynth.Exp(i, n);
+                data[i] = AudioSynth.Sin(880f, t) * env * 0.55f
+                          + (AudioSynth.Hash(i) - 0.5f) * env * 0.12f;
+            }
+
+            AudioSynth.Normalize(data, 0.7f);
+            return AudioSynth.Clip("click", data);
         }
     }
 }

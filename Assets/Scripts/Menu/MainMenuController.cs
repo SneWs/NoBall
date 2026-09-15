@@ -19,8 +19,7 @@ namespace NoBall
         {
             var camera = UiFactory.EnsureCamera(GameColors.CameraBg);
             UiFactory.EnsureEventSystem();
-            _sfx = gameObject.AddComponent<SfxPlayer>();
-            _sfx.Build();
+            _sfx = GameAudio.Ensure().Sfx;
             var backgroundGo = new GameObject("Background");
             backgroundGo.AddComponent<GameBackgroundView>().BuildFullScreen(camera);
             BuildUi();
