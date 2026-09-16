@@ -19,6 +19,20 @@ namespace NoBall
 
         public const int PixelsPerCell = 4;
 
+        public static bool UsesMouseWalls => !UnityEngine.Application.isMobilePlatform;
+
+        public static string BuildWallHint => UsesMouseWalls
+            ? "Left click: vertical wall  •  Right click: horizontal wall"
+            : "Swipe horizontally or vertically to build a wall";
+
+        public static string HowToPlay => UsesMouseWalls
+            ? "Left click grows a vertical wall. Right click grows a horizontal wall.\nClose off empty space. Claim 75%."
+            : "Swipe across the room to grow a wall.\nClose off empty space. Claim 75%.";
+
+        public static string ControlsHelp => UsesMouseWalls
+            ? "Left click: up/down wall\nRight click: left/right wall\nA ball hitting a growing wall costs a life."
+            : "Horizontal swipe: left/right wall\nVertical swipe: up/down wall\nA ball hitting a growing wall costs a life.";
+
         public static int CaptureTargetPercent => UnityEngine.Mathf.RoundToInt(CaptureTarget * 100f);
 
         public static int LevelMultiplier(int claimedPercent)

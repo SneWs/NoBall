@@ -11,7 +11,7 @@ namespace NoBall
 
         Camera _camera;
         Playfield _playfield;
-        SwipeReader _swipe;
+        WallInput _wallInput;
         GameHud _hud;
         SfxPlayer _sfx;
         GrowingWall _wall;
@@ -47,23 +47,23 @@ namespace NoBall
             var backgroundGo = new GameObject("Background");
             backgroundGo.AddComponent<GameBackgroundView>().BuildPlayfield(_playfield.WorldSize);
 
-            var swipeGo = new GameObject("Swipe");
-            _swipe = swipeGo.AddComponent<SwipeReader>();
-            _swipe.Build(_camera);
-            _swipe.Swiped += OnSwiped;
+            var inputGo = new GameObject("WallInput");
+            _wallInput = inputGo.AddComponent<WallInput>();
+            _wallInput.Build(_camera);
+            _wallInput.WallRequested += OnWallRequested;
 
             _hud = gameObject.AddComponent<GameHud>();
             _hud.Build(ReturnToMenu, Restart);
             _sfx = GameAudio.Ensure().Sfx;
 
             ResetRun();
-            StartLevel("Swipe horizontally or vertically to build a wall", 4.5f);
+            StartLevel(GameConfig.BuildWallHint, 4.5f);
         }
 
         void OnDestroy()
         {
-            if (_swipe != null)
-                _swipe.Swiped -= OnSwiped;
+            if (_wallInput != null)
+                _wallInput.WallRequested -= OnWallRequested;
         }
 
         void Update()
@@ -87,7 +87,7 @@ namespace NoBall
             if (_ended)
                 return;
 
-            if (_swipe.IsDragging && _wall == null)
+            if (_wallInput.IsDragging && _wall == null)
                 UpdatePreview();
             else
                 _playfield.ClearPreview();
@@ -152,7 +152,7 @@ namespace NoBall
             _sfx.PlayClick();
             CancelNextLevelWait();
             ResetRun();
-            StartLevel("Swipe horizontally or vertically to build a wall", 4.5f);
+            StartLevel(GameConfig.BuildWallHint, 4.5f);
         }
 
         void ReturnToMenu()
@@ -162,17 +162,14 @@ namespace NoBall
             SceneManager.LoadScene(GameConfig.MainMenuScene);
         }
 
-        void OnSwiped(Vector2 start, Vector2 end)
+        void OnWallRequested(Vector2 originWorld, bool horizontal)
         {
             if (_ended || _wall != null)
                 return;
-            if (!_playfield.TryWorldToCell(start, out var origin))
+            if (!_playfield.TryWorldToCell(originWorld, out var origin))
                 return;
             if (_playfield.Grid[origin] != CellState.Empty)
                 return;
-
-            var delta = end - start;
-            bool horizontal = Mathf.Abs(delta.x) >= Mathf.Abs(delta.y);
 
             for (int i = 0; i < _atoms.Count; i++)
             {
@@ -187,13 +184,13 @@ namespace NoBall
 
         void UpdatePreview()
         {
-            if (!_playfield.TryWorldToCell(_swipe.StartWorld, out var origin))
+            if (!_playfield.TryWorldToCell(_wallInput.StartWorld, out var origin))
             {
                 _playfield.ClearPreview();
                 return;
             }
 
-            var delta = _swipe.CurrentWorld - _swipe.StartWorld;
+            var delta = _wallInput.CurrentWorld - _wallInput.StartWorld;
             if (delta.sqrMagnitude < 0.0001f)
             {
                 _playfield.ClearPreview();
@@ -244,7 +241,7 @@ namespace NoBall
         void CompleteLevel()
         {
             _ended = true;
-            _swipe.Cancel();
+            _wallInput.Cancel();
             _playfield.ClearPreview();
             for (int i = 0; i < _atoms.Count; i++)
                 _atoms[i].SetPaused(true);
@@ -291,7 +288,7 @@ namespace NoBall
         void FailLevel()
         {
             _ended = true;
-            _swipe.Cancel();
+            _wallInput.Cancel();
             _playfield.ClearPreview();
             for (int i = 0; i < _atoms.Count; i++)
                 _atoms[i].SetPaused(true);

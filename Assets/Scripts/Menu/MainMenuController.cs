@@ -56,7 +56,7 @@ namespace NoBall
             var how = UiFactory.CreateLabel(
                 "HowTo",
                 _safe,
-                "Swipe across the room to grow a wall.\nClose off empty space. Claim 75%.",
+                GameConfig.HowToPlay,
                 24,
                 GameColors.Muted);
             UiFactory.SetAnchored(how.rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(900, 80), new Vector2(0f, -240f));
@@ -94,7 +94,7 @@ namespace NoBall
             var help = UiFactory.CreateLabel(
                 "Help",
                 card.rectTransform,
-                "Horizontal swipe: left/right wall\nVertical swipe: up/down wall\nA ball hitting a growing wall costs a life.",
+                GameConfig.ControlsHelp,
                 22,
                 GameColors.Muted);
             UiFactory.SetAnchored(help.rectTransform, new Vector2(0.5f, 1f), new Vector2(0.5f, 1f), new Vector2(640, 100), new Vector2(0f, -370f));

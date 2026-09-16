@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.EventSystems;
-using UnityEngine.InputSystem.UI;
+using UnityEngine.InputSystem;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
@@ -69,17 +69,22 @@ namespace NoBall
 
         public static EventSystem EnsureEventSystem()
         {
+            Cursor.visible = true;
+            Cursor.lockState = CursorLockMode.None;
+            if (Mouse.current != null && !Mouse.current.enabled)
+                InputSystem.EnableDevice(Mouse.current);
+
             var existing = Object.FindAnyObjectByType<EventSystem>();
             if (existing != null)
             {
-                if (existing.GetComponent<InputSystemUIInputModule>() == null)
-                    existing.gameObject.AddComponent<InputSystemUIInputModule>();
+                if (existing.GetComponent<DeviceUiInputModule>() == null)
+                    existing.gameObject.AddComponent<DeviceUiInputModule>();
                 return existing;
             }
 
             var go = new GameObject("EventSystem");
             var es = go.AddComponent<EventSystem>();
-            go.AddComponent<InputSystemUIInputModule>();
+            go.AddComponent<DeviceUiInputModule>();
             return es;
         }
 

@@ -47,7 +47,7 @@ namespace NoBall
             UiFactory.SetAnchored(_score.rectTransform, new Vector2(1f, 0.5f), new Vector2(1f, 0.5f), new Vector2(280, 64), new Vector2(-28f, 0f));
             _score.fontStyle = FontStyle.Bold;
 
-            _hint = UiFactory.CreateLabel("Hint", _safe, "Swipe horizontally or vertically to build a wall", 28, GameColors.Muted);
+            _hint = UiFactory.CreateLabel("Hint", _safe, GameConfig.BuildWallHint, 28, GameColors.Muted);
             UiFactory.SetAnchored(_hint.rectTransform, new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(900, 64), new Vector2(0f, 36f));
 
             BuildEndPanel(onMenu, onRetry);

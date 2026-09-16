@@ -6,7 +6,7 @@ using UnityEngine.InputSystem;
 
 namespace NoBall
 {
-    public sealed class SwipeReader : MonoBehaviour
+    public sealed class WallInput : MonoBehaviour
     {
         Camera _camera;
         bool _dragging;
@@ -17,9 +17,8 @@ namespace NoBall
         public bool IsDragging => _dragging;
         public Vector2 StartWorld { get; private set; }
         public Vector2 CurrentWorld { get; private set; }
-        public Vector2 ScreenDelta => _currentScreen - _startScreen;
 
-        public event Action<Vector2, Vector2> Swiped;
+        public event Action<Vector2, bool> WallRequested;
 
         public void Build(Camera camera)
         {
@@ -32,6 +31,30 @@ namespace NoBall
         }
 
         void Update()
+        {
+            if (GameConfig.UsesMouseWalls)
+                UpdateMouse();
+            else
+                UpdateSwipe();
+        }
+
+        void UpdateMouse()
+        {
+            if (GamePointer.LeftPressedThisFrame)
+                RequestWall(horizontal: false);
+            else if (GamePointer.RightPressedThisFrame)
+                RequestWall(horizontal: true);
+        }
+
+        void RequestWall(bool horizontal)
+        {
+            var screen = GamePointer.Position;
+            if (IsOverUi(screen))
+                return;
+            WallRequested?.Invoke(ScreenToWorld(screen), horizontal);
+        }
+
+        void UpdateSwipe()
         {
             var pointer = Pointer.current;
             if (pointer == null)
@@ -61,7 +84,8 @@ namespace NoBall
                 var delta = _currentScreen - _startScreen;
                 if (delta.magnitude < GameConfig.SwipeMinPixels)
                     return;
-                Swiped?.Invoke(StartWorld, CurrentWorld);
+                bool horizontal = Mathf.Abs(CurrentWorld.x - StartWorld.x) >= Mathf.Abs(CurrentWorld.y - StartWorld.y);
+                WallRequested?.Invoke(StartWorld, horizontal);
             }
         }
 
